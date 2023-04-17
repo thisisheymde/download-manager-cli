@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"regexp"
 )
@@ -12,10 +13,19 @@ func CreateFile(url string, filedir string) (*os.File, error) {
 	re := regexp.MustCompile(pattern)
 	filename := re.FindString(url)
 
-	out, err := os.Create(filedir + filename)
-	if err != nil {
-		return nil, err
+	_, err := os.Stat(filename)
+
+	if !os.IsNotExist(err) {
+
+		return nil, errors.New("file already exists")
+
+	} else {
+		out, err := os.Create(filedir + filename)
+		if err != nil {
+			return nil, errors.New("failed to create file")
+		}
+
+		return out, nil
 	}
 
-	return out, nil
 }

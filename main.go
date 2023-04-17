@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
-	"log"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -19,8 +19,10 @@ func main() {
 	flag.Int64Var(&connex, "connections", 4, "put no of connections in here")
 	flag.StringVar(&urllist, "multiple", "", "put filename containing the urls here")
 
-	// Parse the command-line arguments
+	//Parse the command-line arguments
 	flag.Parse()
+
+	count := 0
 
 	if url != "" && urllist == "" {
 		downloader, err := NewDownloadManager(url, dir, connex)
@@ -29,11 +31,16 @@ func main() {
 			panic(err)
 		}
 
-		downloader.Download()
+		err = downloader.Download(count)
+
+		if err != nil {
+			panic(err)
+		}
+
 	} else if urllist != "" && url == "" {
 		file, err := os.Open(urllist)
 		if err != nil {
-			log.Println("Error opening file:", err)
+			fmt.Println("Error opening file:", err)
 			return
 		}
 		defer file.Close()
@@ -41,6 +48,10 @@ func main() {
 		var mwg sync.WaitGroup
 
 		scanner := bufio.NewScanner(file)
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error reading file:", err)
+		}
+
 		for scanner.Scan() {
 			line := scanner.Text()
 			mwg.Add(1)
@@ -53,19 +64,19 @@ func main() {
 					panic(err)
 				}
 
-				downloader.Download()
-			}(line)
-		}
+				count += 1
+				err = downloader.Download(count)
 
-		if err := scanner.Err(); err != nil {
-			log.Println("Error reading file:", err)
+				if err != nil {
+					panic(err)
+				}
+
+			}(line)
 		}
 
 		mwg.Wait()
 
 	} else {
-		log.Println("enter flags correctly.")
+		fmt.Println("enter flags correctly.")
 	}
-
-	log.Println("Finally Free!!!")
 }

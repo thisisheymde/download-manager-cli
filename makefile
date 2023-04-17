@@ -3,3 +3,6 @@ build:
 
 run: build
 	@./bin/ddman
+
+test:
+	@go test -v ./...

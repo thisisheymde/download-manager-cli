@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type DownloadManager struct {
@@ -14,7 +14,6 @@ type DownloadManager struct {
 	NumParts  int64
 	Client    *http.Client
 	Parts     [][2]int64
-	Progress  []int64
 }
 
 func NewDownloadManager(url string, outputdir string, numParts int64) (*DownloadManager, error) {
@@ -38,18 +37,25 @@ func NewDownloadManager(url string, outputdir string, numParts int64) (*Download
 		segments[i] = [2]int64{start, end}
 	}
 
+	tr := &http.Transport{
+		ResponseHeaderTimeout: 45 * time.Second,
+	}
+
 	return &DownloadManager{
 		URL:       url,
 		OutputDir: outputdir,
 		NumParts:  numParts,
-		Client:    &http.Client{},
-		Parts:     segments,
-		Progress:  make([]int64, numParts),
+		Client: &http.Client{
+			Transport: tr,
+		},
+		Parts: segments,
 	}, nil
 }
 
 // fix error handling
-func (dm *DownloadManager) Download() error {
+func (dm *DownloadManager) Download(count int) error {
+
+	timeTaken := time.Now()
 
 	// create file
 	out, err := CreateFile(dm.URL, dm.OutputDir)
@@ -60,6 +66,8 @@ func (dm *DownloadManager) Download() error {
 
 	var wg sync.WaitGroup
 
+	errChan := make(chan error)
+
 	for i, segment := range dm.Parts {
 		wg.Add(1)
 		go func(i int, segment [2]int64) {
@@ -67,7 +75,7 @@ func (dm *DownloadManager) Download() error {
 
 			req, err := http.NewRequest("GET", dm.URL, nil)
 			if err != nil {
-				log.Println(err)
+				errChan <- err
 				return
 			}
 
@@ -75,7 +83,7 @@ func (dm *DownloadManager) Download() error {
 
 			resp, err := dm.Client.Do(req)
 			if err != nil {
-				log.Println(err)
+				errChan <- err
 				return
 			}
 
@@ -88,7 +96,7 @@ func (dm *DownloadManager) Download() error {
 			for {
 				n, err := resp.Body.Read(buf)
 				if err != nil && err != io.EOF {
-					log.Println(err)
+					errChan <- err
 					return
 				}
 				if n == 0 {
@@ -96,20 +104,25 @@ func (dm *DownloadManager) Download() error {
 				}
 				_, err = out.WriteAt(buf[:n], segment[0])
 				if err != nil {
-					log.Println(err)
+					errChan <- err
 					return
 				}
 				segment[0] += int64(n)
-
-				dm.Progress[i] = dm.Progress[i] + 1
 			}
 
 		}(i, segment)
 	}
 
-	wg.Wait()
+	select {
+	case err := <-errChan:
+		return err
 
-	log.Println("Download Completed!")
+	default:
+		wg.Wait()
 
-	return nil
+		fmt.Printf("Download %v Completed! took : %v \n", count, time.Since(timeTaken))
+
+		return nil
+	}
+
 }
