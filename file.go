@@ -9,14 +9,12 @@ import (
 const pattern = `[^\/]+$`
 
 func CreateFile(url string, filedir string) (*os.File, error) {
-
 	re := regexp.MustCompile(pattern)
 	filename := re.FindString(url)
 
-	_, err := os.Stat(filename)
+	_, err := os.Stat(filedir + filename)
 
 	if !os.IsNotExist(err) {
-
 		return nil, errors.New("file already exists")
 
 	} else {
@@ -28,4 +26,10 @@ func CreateFile(url string, filedir string) (*os.File, error) {
 		return out, nil
 	}
 
+}
+
+func DeleteFile(url string, filedir string) {
+	re := regexp.MustCompile(pattern)
+	filename := re.FindString(url)
+	os.Remove(filename)
 }

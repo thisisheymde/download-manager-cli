@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -28,13 +29,15 @@ func main() {
 		downloader, err := NewDownloadManager(url, dir, connex)
 
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
 
 		err = downloader.Download(count)
 
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
 
 	} else if urllist != "" && url == "" {
@@ -58,19 +61,22 @@ func main() {
 			go func(d string) {
 				defer mwg.Done()
 
-				downloader, err := NewDownloadManager(d, dir, 6)
+				downloader, err := NewDownloadManager(d, dir, connex)
 
 				if err != nil {
-					panic(err)
+					log.Println("Error in initializing.")
+					log.Println(err)
+					return
 				}
 
 				count += 1
 				err = downloader.Download(count)
 
 				if err != nil {
-					panic(err)
+					log.Println("Failed to download.")
+					log.Println(err)
+					return
 				}
-
 			}(line)
 		}
 

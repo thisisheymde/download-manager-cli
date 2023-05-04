@@ -38,7 +38,7 @@ func NewDownloadManager(url string, outputdir string, numParts int64) (*Download
 	}
 
 	tr := &http.Transport{
-		ResponseHeaderTimeout: 45 * time.Second,
+		ResponseHeaderTimeout: 15 * time.Second,
 	}
 
 	return &DownloadManager{
@@ -52,12 +52,10 @@ func NewDownloadManager(url string, outputdir string, numParts int64) (*Download
 	}, nil
 }
 
-// fix error handling
 func (dm *DownloadManager) Download(count int) error {
 
 	timeTaken := time.Now()
 
-	// create file
 	out, err := CreateFile(dm.URL, dm.OutputDir)
 	if err != nil {
 		return err
@@ -115,6 +113,7 @@ func (dm *DownloadManager) Download(count int) error {
 
 	select {
 	case err := <-errChan:
+		DeleteFile(dm.URL, dm.OutputDir)
 		return err
 
 	default:
