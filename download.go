@@ -47,13 +47,13 @@ func NewDownloadManager(url string, outputdir string, numParts int64) (*Download
 		NumParts:  numParts,
 		Client: &http.Client{
 			Transport: tr,
+			Timeout:   15 * time.Second,
 		},
 		Parts: segments,
 	}, nil
 }
 
 func (dm *DownloadManager) Download(count int) error {
-
 	timeTaken := time.Now()
 
 	out, err := CreateFile(dm.URL, dm.OutputDir)
@@ -65,15 +65,19 @@ func (dm *DownloadManager) Download(count int) error {
 	var wg sync.WaitGroup
 
 	errChan := make(chan error)
+	doneChan := make(chan bool, len(dm.Parts))
 
 	for i, segment := range dm.Parts {
 		wg.Add(1)
 		go func(i int, segment [2]int64) {
-			defer wg.Done()
+			defer func() {
+				wg.Done()
+			}()
 
 			req, err := http.NewRequest("GET", dm.URL, nil)
 			if err != nil {
 				errChan <- err
+				doneChan <- true
 				return
 			}
 
@@ -82,46 +86,58 @@ func (dm *DownloadManager) Download(count int) error {
 			resp, err := dm.Client.Do(req)
 			if err != nil {
 				errChan <- err
+				doneChan <- true
 				return
 			}
 
-			defer resp.Body.Close()
+			defer func() {
+				resp.Body.Close()
+			}()
 
 			// download
 
 			buf := make([]byte, 1024)
 
-			for {
-				n, err := resp.Body.Read(buf)
-				if err != nil && err != io.EOF {
-					errChan <- err
+			loop := true
+
+			for loop {
+				select {
+				case <-doneChan:
 					return
+				default:
+					n, err := resp.Body.Read(buf)
+					if err != nil && err != io.EOF {
+						errChan <- err
+						doneChan <- true
+						return
+					}
+					if n == 0 {
+						loop = false
+					}
+					_, err = out.WriteAt(buf[:n], segment[0])
+					if err != nil {
+						errChan <- err
+						doneChan <- true
+						return
+					}
+					segment[0] += int64(n)
 				}
-				if n == 0 {
-					break
-				}
-				_, err = out.WriteAt(buf[:n], segment[0])
-				if err != nil {
-					errChan <- err
-					return
-				}
-				segment[0] += int64(n)
 			}
 
 		}(i, segment)
 	}
 
-	select {
-	case err := <-errChan:
+	wg.Wait()
+
+	close(doneChan)
+	close(errChan)
+
+	if <-errChan != nil {
 		DeleteFile(dm.URL, dm.OutputDir)
-		return err
-
-	default:
-		wg.Wait()
-
-		fmt.Printf("Download %v Completed! took : %v \n", count, time.Since(timeTaken))
-
-		return nil
+		fmt.Printf("Download %v Failed! took : %v \n", count, time.Since(timeTaken))
+		return <-errChan
 	}
 
+	fmt.Printf("Download %v Completed! took : %v \n", count, time.Since(timeTaken))
+	return nil
 }

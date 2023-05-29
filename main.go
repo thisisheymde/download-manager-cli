@@ -23,6 +23,7 @@ func main() {
 	//Parse the command-line arguments
 	flag.Parse()
 
+	var countMutex sync.Mutex
 	count := 0
 
 	if url != "" && urllist == "" {
@@ -58,22 +59,24 @@ func main() {
 		for scanner.Scan() {
 			line := scanner.Text()
 			mwg.Add(1)
+
 			go func(d string) {
 				defer mwg.Done()
 
 				downloader, err := NewDownloadManager(d, dir, connex)
 
 				if err != nil {
-					log.Println("Error in initializing.")
 					log.Println(err)
 					return
 				}
 
+				countMutex.Lock()
 				count += 1
+				countMutex.Unlock()
+
 				err = downloader.Download(count)
 
 				if err != nil {
-					log.Println("Failed to download.")
 					log.Println(err)
 					return
 				}
