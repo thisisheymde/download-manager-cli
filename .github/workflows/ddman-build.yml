@@ -16,7 +16,6 @@ jobs:
 
       - name: Build
         run: |
-          go mod download && go mod verify
           go build -o ddman
 
   release:
