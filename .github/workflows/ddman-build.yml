@@ -18,6 +18,12 @@ jobs:
         run: |
           go build -o ddman
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ddman-binary
+          path: ddman
+  
   release:
     name: project release
     runs-on: ubuntu-latest
