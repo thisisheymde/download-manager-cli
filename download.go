@@ -47,7 +47,6 @@ func NewDownloadManager(url string, outputdir string, numParts int64) (*Download
 		NumParts:  numParts,
 		Client: &http.Client{
 			Transport: tr,
-			Timeout:   15 * time.Second,
 		},
 		Parts: segments,
 	}, nil
@@ -127,10 +126,11 @@ func (dm *DownloadManager) Download(count int) error {
 		}(i, segment)
 	}
 
-	wg.Wait()
-
-	close(doneChan)
-	close(errChan)
+	go func() {
+		wg.Wait()
+		close(doneChan)
+		close(errChan)
+	}()
 
 	if <-errChan != nil {
 		DeleteFile(dm.URL, dm.OutputDir)
