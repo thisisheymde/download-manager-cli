@@ -16,8 +16,8 @@ jobs:
 
       - name: Build
         run: |
-        go mod tidy
-        go build -o ddman
+          go mod tidy
+          go build -o ddman
 
   release:
     name: project release
