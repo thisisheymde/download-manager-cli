@@ -15,7 +15,9 @@ jobs:
           go-version: 1.19
 
       - name: Build
-        run: go build -o ddman
+        run: |
+        go mod tidy
+        go build -o ddman
 
   release:
     name: project release
